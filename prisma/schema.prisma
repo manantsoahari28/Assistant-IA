@@ -64,13 +64,14 @@ model Conversation {
   tenant         Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   userExternalId String?
   category       Category?
-  status         ConversationStatus @default(ACTIVE)
+  status         ConversationStatus @default(BOT)
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 
   messages Message[]
 
   @@index([tenantId, category])
+  @@index([tenantId, status])
 }
 
 enum Category {
@@ -80,9 +81,10 @@ enum Category {
 }
 
 enum ConversationStatus {
-  ACTIVE
+  BOT
+  PENDING_HUMAN
+  HUMAN_ACTIVE
   CLOSED
-  ESCALATED
 }
 
 // 5. MESSAGES

@@ -1,5 +1,5 @@
 // src/knowledge/knowledge.service.ts
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Tenant } from '@prisma/client';
 import OpenAI from 'openai';
@@ -76,6 +76,43 @@ export class KnowledgeService {
       message: 'Document ingéré et vectorisé avec succès',
       documentId: doc.id,
       chunksCreated: chunksText.length,
+    };
+  }
+
+  /**
+   * Récupère tous les documents associés au tenantId avec le nombre de chunks créés
+   */
+  async findAllDocuments(tenantId: string) {
+    return this.prisma.knowledgeBaseDocument.findMany({
+      where: { tenantId },
+      include: {
+        _count: {
+          select: { chunks: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /**
+   * Supprime un document s'il appartient bien au tenant (cascade delete sur DocumentChunk)
+   */
+  async deleteDocument(tenantId: string, documentId: string) {
+    const document = await this.prisma.knowledgeBaseDocument.findFirst({
+      where: { id: documentId, tenantId },
+    });
+
+    if (!document) {
+      throw new NotFoundException('Document introuvable ou non autorisé');
+    }
+
+    await this.prisma.knowledgeBaseDocument.delete({
+      where: { id: documentId },
+    });
+
+    return {
+      message: 'Document supprimé avec succès',
+      documentId,
     };
   }
 
