@@ -1,0 +1,108 @@
+
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 1. ENTREPRISES (TENANTS)
+model Tenant {
+  id              String   @id @default(uuid())
+  name            String
+  apiKeyHash      String   @unique
+  botSystemPrompt String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  documents     KnowledgeBaseDocument[]
+  conversations Conversation[]
+  messages      Message[]
+  chunks        DocumentChunk[]
+}
+
+// 2. BASE DE CONNAISSANCE (RAG)
+model KnowledgeBaseDocument {
+  id        String         @id @default(uuid())
+  tenantId  String
+  tenant    Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  title     String
+  sourceUrl String?
+  status    DocumentStatus @default(PENDING)
+  createdAt DateTime       @default(now())
+
+  chunks DocumentChunk[]
+}
+
+enum DocumentStatus {
+  PENDING
+  PROCESSED
+  FAILED
+}
+
+// 3. MORCEAUX DE DOCUMENTS (CHUNKS)
+model DocumentChunk {
+  id         String                @id @default(uuid())
+  tenantId   String
+  tenant     Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  documentId String
+  document   KnowledgeBaseDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  content    String
+  createdAt  DateTime              @default(now())
+
+  @@index([tenantId])
+}
+
+// 4. CONVERSATIONS
+model Conversation {
+  id             String             @id @default(uuid())
+  tenantId       String
+  tenant         Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userExternalId String?
+  category       Category?
+  status         ConversationStatus @default(ACTIVE)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  messages Message[]
+
+  @@index([tenantId, category])
+}
+
+enum Category {
+  BUG
+  QUESTION
+  RECLAMATION
+}
+
+enum ConversationStatus {
+  ACTIVE
+  CLOSED
+  ESCALATED
+}
+
+// 5. MESSAGES
+model Message {
+  id             String       @id @default(uuid())
+  tenantId       String
+  tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           MessageRole
+  content        String
+  tokensUsed     Int?
+  metadata       Json?
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId])
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
