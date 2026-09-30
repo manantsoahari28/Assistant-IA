@@ -101,7 +101,7 @@ export const DashboardView: React.FC = () => {
               Tableau de bord des demandes
             </h1>
             <Badge variant="default" className="text-xs">
-              Sujet 4 • Analytique
+              Analytique
             </Badge>
           </div>
           <p className="text-sm text-[var(--text-secondary)] mt-1">

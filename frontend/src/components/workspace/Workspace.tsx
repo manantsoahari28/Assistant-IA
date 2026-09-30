@@ -84,6 +84,19 @@ export const Workspace: React.FC = () => {
         {/* Center: Navigation Views */}
         <nav className="flex items-center gap-1 bg-[var(--surface-hover)] p-1 rounded-xl border border-[var(--border-subtle)]">
           <button
+            onClick={() => setActiveTab('dashboard')}
+            className={cn(
+              'flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer',
+              activeTab === 'dashboard'
+                ? 'bg-[var(--surface)] text-[var(--text-primary)] shadow-xs'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+            )}
+          >
+            <BarChart3 className="h-4 w-4" />
+            <span>Tableau de bord</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('inbox')}
             className={cn(
               'flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer',
@@ -99,22 +112,6 @@ export const Workspace: React.FC = () => {
                 {pendingCount}
               </span>
             )}
-          </button>
-
-          <button
-            onClick={() => setActiveTab('dashboard')}
-            className={cn(
-              'flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer',
-              activeTab === 'dashboard'
-                ? 'bg-[var(--surface)] text-[var(--text-primary)] shadow-xs'
-                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-            )}
-          >
-            <BarChart3 className="h-4 w-4" />
-            <span>Tableau de bord</span>
-            <span className="text-[10px] font-mono text-indigo-400 font-bold">
-              Sujet 4
-            </span>
           </button>
 
           <button
