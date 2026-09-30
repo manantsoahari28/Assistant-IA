@@ -1,115 +1,418 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+﻿# Assistant-IA
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+> **Plateforme de support client multi-tenant combinant génération augmentée par la récupération (RAG) et collaboration humain-IA.**
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+[![NestJS](https://img.shields.io/badge/NestJS-12-E0234E?logo=nestjs&logoColor=white)](https://nestjs.com/)
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-pgvector-336791?logo=postgresql&logoColor=white)](https://github.com/pgvector/pgvector)
+[![Prisma](https://img.shields.io/badge/Prisma-6-2D3748?logo=prisma&logoColor=white)](https://www.prisma.io/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![License](https://img.shields.io/badge/License-UNLICENSED-red)](./LICENSE)
 
-## Description
+---
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Table des matières
 
-## Project setup
+- [Vue d ensemble](#vue-densemble)
+- [Architecture](#architecture)
+- [Stack technique](#stack-technique)
+- [Prérequis](#prérequis)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Lancer le projet](#lancer-le-projet)
+- [API Reference](#api-reference)
+- [Cycle de vie des conversations](#cycle-de-vie-des-conversations)
+- [Base de connaissances and RAG](#base-de-connaissances-et-rag)
+- [Multi-tenancy and Sécurité](#multi-tenancy-et-sécurité)
+- [Structure du projet](#structure-du-projet)
+- [Tests](#tests)
+- [Décisions d architecture (ADR)](#décisions-darchitecture-adr)
 
-```bash
-$ npm install
+---
+
+## Vue d ensemble
+
+**Assistant-IA** est une plateforme de support client entreprise qui élimine deux risques majeurs de l automatisation :
+
+| Risque | Solution apportée |
+|--------|-------------------|
+| **Hallucination IA** | Chaque réponse du bot est strictement ancrée dans des documents de connaissance vectorisés via `pgvector` (cosine similarity) |
+| **Boucles sans issue** | Transitions d état déterministes `BOT → PENDING_HUMAN → HUMAN_ACTIVE → CLOSED` avec zéro perte de contexte |
+
+La plateforme expose **deux surfaces** depuis un unique backend NestJS :
+
+- 🖥️ **Workspace Counselor** — Console opérationnelle interne pour les conseillers (triage, prise en charge, résolution)
+- 💬 **Widget Embeddable** — Interface de chat flottante intégrée sur les sites clients
+
+---
+
+## Architecture
+
+```
++----------------------------------------------------------+
+|                 Frontend (Vite + React 19)               |
+|                                                          |
+|  +----------------------+   +----------------------+     |
+|  | Counselor Workspace  |   | Embeddable Widget    |     |
+|  | (Triage, Prise en   |   | (Chat client léger)  |     |
+|  |  charge, RAG view)  |   +----------------------+     |
+|  +----------------------+                                |
++-------------------------+--------------------------------+
+                          | REST API (x-api-key)
++-------------------------v--------------------------------+
+|                NestJS Backend (port 3000)                |
+|                                                          |
+|  +----------+  +-----------+  +--------+  +----------+  |
+|  |   Chat   |  | Knowledge |  | Tenant |  |   Auth   |  |
+|  |  Module  |  |  Module   |  | Module |  |  Module  |  |
+|  +-----+----+  +-----+-----+  +--------+  +----------+  |
+|        |             |                                   |
+|  +-----v-------------v----------------------------------+ |
+|  |           Google Gemini API                         | |
+|  |  gemini-2.5-flash-lite (gen) + text-embedding-004  | |
+|  +-----------------------------------------------------+ |
++-------------------------+--------------------------------+
+                          | Prisma ORM
++-------------------------v--------------------------------+
+|          PostgreSQL + pgvector (Supabase)                |
+|                                                          |
+|  Tenants | Conversations | Messages | KnowledgeDocs      |
+|  DocumentChunks | DocumentChunkVectors (vector 768)      |
++----------------------------------------------------------+
 ```
 
-## Compile and run the project
+---
+
+## Stack technique
+
+### Backend
+
+| Technologie | Version | Rôle |
+|-------------|---------|------|
+| **NestJS** | 12 | Framework backend modulaire |
+| **TypeScript** | 6 | Typage statique |
+| **Prisma ORM** | 6 | Accès base de données + migrations |
+| **PostgreSQL + pgvector** | — | Base relationnelle + recherche vectorielle |
+| **Google Gemini API** | — | LLM (`gemini-2.5-flash-lite`) + embeddings (`text-embedding-004`, 768 dims) |
+| **Swagger / OpenAPI** | — | Documentation API interactive (`/api`) |
+| **Jest** | 30 | Tests unitaires et d intégration |
+| **oxlint** | — | Linting rapide |
+
+### Frontend
+
+| Technologie | Version | Rôle |
+|-------------|---------|------|
+| **Vite** | 8 | Build tool et dev server |
+| **React** | 19 | UI SPA dual-surface |
+| **TypeScript** | 6 | Typage statique |
+| **Tailwind CSS** | 4 | Styles utilitaires |
+| **Radix UI** | — | Composants accessibles (Dialog, Tabs, Tooltip, Dropdown) |
+| **Lucide React** | — | Icônes |
+
+---
+
+## Prérequis
+
+- **Node.js** >= 20 LTS
+- **npm** >= 10
+- **PostgreSQL** avec l extension `pgvector` activée (ou un compte [Supabase](https://supabase.com/))
+- **Clé API Google Gemini** — [Obtenir une clé](https://ai.google.dev/)
+
+---
+
+## Installation
 
 ```bash
-# development
-$ npm run start
+# 1. Cloner le dépôt
+git clone <URL_DU_DEPOT>
+cd support-ia
 
-# watch mode
-$ npm run start:dev
+# 2. Installer les dépendances backend (génère aussi le client Prisma)
+npm install
 
-# production mode
-$ npm run start:prod
+# 3. Installer les dépendances frontend
+npm install --prefix frontend
 ```
 
-## Run tests
+---
+
+## Configuration
+
+Créer un fichier `.env` à la racine en vous basant sur ce modèle :
+
+```env
+# URL avec pgBouncer (pooling) — utilisée par l application en exécution (port 6543)
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:6543/postgres?sslmode=require&pgbouncer=true"
+
+# URL directe — utilisée par Prisma pour les migrations et prisma db push (port 5432)
+DIRECT_URL="postgresql://USER:PASSWORD@HOST:5432/postgres?sslmode=require"
+
+# Clé API Google Gemini
+GEMINI_API_KEY="votre_cle_api_gemini"
+```
+
+> **Attention** : Ne commitez jamais votre fichier `.env`. Il est inclus dans `.gitignore`.
+
+### Initialiser la base de données
 
 ```bash
-# unit tests
-$ npm run test
+# Appliquer le schéma Prisma à la base de données
+npx prisma db push
 
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+# (Optionnel) Insérer des données de test
+npx prisma db seed
 ```
 
-## Deployment
+---
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+## Lancer le projet
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### Développement — backend + frontend simultanément
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+npm run dev
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+Lance en parallèle :
+- **Backend NestJS** en mode watch sur `http://localhost:3000`
+- **Frontend Vite** sur `http://localhost:5173`
 
-## Observability
+### Lancer séparément
 
-In production applications, observability is essential for understanding how your system behaves, detecting issues early, and maintaining reliable performance.
+```bash
+# Backend uniquement
+npm run dev:backend
 
-[NestJS Observe](https://observe.nestjs.com) automatically instruments your NestJS application, giving you deep visibility into your system with minimal setup:
+# Frontend uniquement
+npm run dev:frontend
+```
 
-- **Distributed tracing:** Follow requests across services and understand how they flow through your system.
-- **Waterfall analysis:** Visualize request execution and identify slow operations, bottlenecks, and unexpected delays.
-- **Performance analysis:** Analyze application performance in real time and quickly pinpoint areas that need optimization.
-- **Metrics:** Track key application and infrastructure metrics to understand system health and performance trends.
-- **Logging:** Centralize and correlate logs with traces and other telemetry to make debugging easier.
-- **Error tracking:** Detect errors quickly and investigate their root causes with the surrounding context.
-- **SLA monitoring:** Track service-level objectives and identify when your application is approaching or exceeding defined thresholds.
-- **Alarms and alerts:** Set up alerts for critical errors, performance degradation, SLA violations, and other anomalies so your team can react quickly.
+### Production
 
-## Resources
+```bash
+npm run build
+npm run start:prod
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+### Accès rapide
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Auto-instrument your application with [NestJS Observer](https://observer.nestjs.com). Distributed tracing, metrics, and logging made easy. Error tracking and performance monitoring for your NestJS applications.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+| Surface | URL |
+|---------|-----|
+| Workspace Counselor | `http://localhost:5173` |
+| Documentation API Swagger | `http://localhost:3000/api` |
+| API Backend | `http://localhost:3000` |
 
-## Support
+---
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+## API Reference
 
-## Stay in touch
+Toutes les routes exigent l en-tête d authentification :
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+```
+x-api-key: <cle_api_du_tenant>
+```
 
-## License
+La documentation Swagger interactive complète est disponible sur `/api`.
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
-"# Assistant-IA" 
+### Module Chat — `/chat`
+
+| Méthode | Endpoint | Description |
+|---------|----------|-------------|
+| `POST` | `/chat/conversations` | Créer une nouvelle conversation |
+| `GET` | `/chat/conversations` | Lister les conversations du tenant |
+| `GET` | `/chat/conversations/:id` | Détail d une conversation avec ses messages |
+| `POST` | `/chat/conversations/:id/messages` | Envoyer un message customer (IA répond en état BOT) |
+| `POST` | `/chat/conversations/:id/escalate` | Escalader manuellement vers PENDING_HUMAN |
+| `POST` | `/chat/conversations/:id/take-over` | Conseiller prend en charge (HUMAN_ACTIVE) |
+| `POST` | `/chat/conversations/:id/agent-message` | Envoyer un message de conseiller |
+| `POST` | `/chat/conversations/:id/resolve` | Résoudre ou renvoyer au bot |
+
+### Module Knowledge — `/knowledge`
+
+| Méthode | Endpoint | Description |
+|---------|----------|-------------|
+| `POST` | `/knowledge/documents` | Uploader un document (texte brut ou PDF) |
+| `GET` | `/knowledge/documents` | Lister les documents du tenant |
+| `DELETE` | `/knowledge/documents/:id` | Supprimer un document et ses chunks vectoriels |
+
+### Module Tenant — `/tenant`
+
+| Méthode | Endpoint | Description |
+|---------|----------|-------------|
+| `GET` | `/tenant/settings` | Récupérer les paramètres du tenant |
+| `PATCH` | `/tenant/settings` | Mettre à jour nom et prompt système du bot |
+
+---
+
+## Cycle de vie des conversations
+
+```
+             +-------------+
+             |     BOT     |  <-- État initial
+             | (IA répond) |
+             +------+------+
+                    |  escalation (manuelle, customer request,
+                    |  ou signal [ESCALATE_TO_HUMAN] du LLM)
+             +------v------+
+             |PENDING_HUMAN|  <-- File d attente triage
+             +------+------+
+                    |  take-over conseiller
+             +------v------+
+             |HUMAN_ACTIVE |  <-- Conseiller actif (bot muet)
+             +------+------+
+                    |  resolve()
+        +-----------+-----------+
+        |                       |
+        | returnToBot: false    | returnToBot: true
++-------v-------+       +-------v-------+
+|   RESOLVED    |       |      BOT      |
+| (24h cooldown)|       | (reprise IA)  |
++-------+-------+       +---------------+
+        |  expiration / confirmation
++-------v-------+
+|    CLOSED     |  <-- État terminal immuable
++---------------+
+```
+
+**Règles clés :**
+- En état `BOT`, la mémoire conversationnelle couvre les **10 derniers messages**
+- L escalade automatique se déclenche si le bot émet `[ESCALATE_TO_HUMAN]` ou si la récupération est insuffisante
+- En état `HUMAN_ACTIVE`, le bot est **entièrement désactivé**
+- `CLOSED` est **immuable** — toute nouvelle demande ouvre une nouvelle conversation
+
+---
+
+## Base de connaissances et RAG
+
+### Pipeline d ingestion
+
+```
+Document texte / PDF
+        |
+        v
+  Extraction texte (pdf-parse)
+        |
+        v
+  Découpage en chunks (~500 caractères)
+        |
+        v
+  Embeddings vectoriels (text-embedding-004, 768 dims)
+        |
+        v
+  Stockage PostgreSQL + pgvector (index HNSW)
+  Statut : PENDING --> PROCESSED | FAILED
+```
+
+### Recherche vectorielle à chaque message BOT
+
+1. Génération de l embedding de la question customer
+2. Recherche cosinus sur `DocumentChunkVector` **filtrée par `tenantId`**
+3. Injection des chunks pertinents dans le prompt système Gemini
+4. Réponse **uniquement** à partir de ces chunks — si aucun chunk pertinent : escalade automatique
+
+---
+
+## Multi-tenancy et Sécurité
+
+| Mécanisme | Description |
+|-----------|-------------|
+| **Isolation stricte** | Chaque requête SQL, embedding et index est filtré par `tenantId` |
+| **Authentification** | Clé API via `x-api-key`, vérifiée contre le hash SHA-256 (`apiKeyHash`) |
+| **Stockage sécurisé** | Seul le digest SHA-256 irréversible est persisté — jamais la clé en clair |
+| **Cascade de suppression** | La suppression d un tenant supprime toutes ses données associées |
+
+---
+
+## Structure du projet
+
+```
+support-ia/
+├── src/                          # Code source backend NestJS
+│   ├── auth/                     # Middleware x-api-key
+│   ├── chat/                     # Conversations, messages, handoff RAG
+│   │   ├── dto/                  # Data Transfer Objects (validation)
+│   │   ├── chat.controller.ts
+│   │   └── chat.service.ts       # Logique RAG, transitions d état, Gemini
+│   ├── knowledge/                # Ingestion documents, chunks, embeddings
+│   │   ├── knowledge.controller.ts
+│   │   └── knowledge.service.ts
+│   ├── tenant/                   # Paramètres tenant, prompt système
+│   ├── prisma/                   # Service Prisma partagé
+│   └── main.ts                   # Bootstrap + Swagger
+├── frontend/                     # Frontend Vite + React 19
+│   └── src/
+│       ├── workspace/            # Counselor Workspace
+│       └── widget/               # Embeddable Customer Widget
+├── prisma/
+│   ├── schema.prisma             # Schéma PostgreSQL + pgvector
+│   └── seed.ts                   # Données de test
+├── docs/
+│   └── adr/                      # Architectural Decision Records (0001-0007)
+├── test/                         # Tests e2e
+├── CONTEXT.md                    # Vocabulaire métier canonique
+├── PRODUCT.md                    # Vision produit et contraintes
+└── .env                          # Variables d environnement (non versionné)
+```
+
+---
+
+## Tests
+
+```bash
+# Tests unitaires
+npm test
+
+# Tests en mode watch
+npm run test:watch
+
+# Couverture de code
+npm run test:cov
+
+# Tests e2e
+npm run test:e2e
+
+# Linting
+npm run lint
+
+# Formatage
+npm run format
+```
+
+---
+
+## Décisions d architecture (ADR)
+
+| ADR | Décision |
+|-----|----------|
+| [0001](./docs/adr/0001-vite-react-spa-dual-surface.md) | Vite + React SPA pour les deux surfaces (Workspace et Widget) |
+| [0002](./docs/adr/0002-decoupled-pgvector-hnsw-table.md) | Table `DocumentChunkVector` découplée avec index HNSW |
+| [0003](./docs/adr/0003-two-tier-escalation-tool-calling.md) | Escalade en deux niveaux via tool calling Gemini |
+| [0004](./docs/adr/0004-head-and-tail-context-budgeting.md) | Budgetisation head+tail de la mémoire conversationnelle |
+| [0005](./docs/adr/0005-escalate-to-counselor-tool-schema.md) | Schéma du tool `escalate_to_counselor` |
+| [0006](./docs/adr/0006-hybrid-courtesy-filter-resolved-conversations.md) | Filtre de courtoisie hybride pour conversations résolues |
+| [0007](./docs/adr/0007-denormalized-tenant-id-vector-isolation.md) | `tenantId` dénormalisé dans `DocumentChunkVector` pour l isolation vectorielle |
+
+---
+
+## Modèle de données
+
+```
+Tenant (1) --< KnowledgeBaseDocument (1) --< DocumentChunk (1) --< DocumentChunkVector
+                                                                     (embedding vector(768))
+
+Tenant (1) --< Conversation (1) --< Message
+                   |
+                   +-- status   : BOT | PENDING_HUMAN | HUMAN_ACTIVE | RESOLVED | CLOSED
+                   +-- category : BUG | QUESTION | RECLAMATION
+                   +-- role     : USER | ASSISTANT | SYSTEM
+```
+
+---
+
+<div align="center">
+
+**Assistant-IA** — Sujet 4 · Backend pour assistant de support client basé sur une IA
+
+*NestJS · React · pgvector · Google Gemini*
+
+</div>
