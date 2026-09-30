@@ -4,6 +4,7 @@ import { KnowledgeController } from './knowledge.controller';
 
 @Module({
   providers: [KnowledgeService],
-  controllers: [KnowledgeController]
+  controllers: [KnowledgeController],
+  exports: [KnowledgeService],
 })
 export class KnowledgeModule {}

@@ -34,6 +34,8 @@ export class KnowledgeService {
     // 2. Découper le contenu en morceaux (Chunks) d'environ 500 caractères
     const chunksText = this.splitTextIntoChunks(dto.content, 500);
 
+    let hasFailed = false;
+
     // 3. Traiter chaque morceau et insérer dans la base
     for (const chunkText of chunksText) {
       const chunk = await this.prisma.documentChunk.create({
@@ -54,8 +56,19 @@ export class KnowledgeService {
 
         const embedding = embeddingResponse.data[0].embedding;
 
-        // Mise à jour directe dans PostgreSQL via pgvector
+        // Mise à jour dans la table découplée DocumentChunkVector (ADR 0002 & ADR 0007)
+        // et rétro-compatibilité sur DocumentChunk
         const vectorString = `[${embedding.join(',')}]`;
+        await this.prisma.$executeRawUnsafe(
+          `INSERT INTO "document_chunk_vectors" ("id", "tenantId", "chunkId", "embedding", "createdAt")
+           VALUES (gen_random_uuid()::text, $1, $2, $3::vector, NOW())
+           ON CONFLICT ("chunkId") DO UPDATE SET "embedding" = $3::vector`,
+          tenant.id,
+          chunk.id,
+          vectorString,
+        );
+
+        // Maintenir le champ rétro-compatible sur DocumentChunk
         await this.prisma.$executeRawUnsafe(
           `UPDATE "DocumentChunk" SET embedding = $1::vector WHERE id = $2`,
           vectorString,
@@ -63,7 +76,23 @@ export class KnowledgeService {
         );
       } catch (err) {
         console.error('Erreur lors de la génération du vecteur :', err);
+        hasFailed = true;
+        break;
       }
+    }
+
+    if (hasFailed) {
+      await this.prisma.knowledgeBaseDocument.update({
+        where: { id: doc.id },
+        data: { status: 'FAILED' },
+      });
+
+      return {
+        message: 'Échec de la génération des embeddings pour le document',
+        documentId: doc.id,
+        status: 'FAILED',
+        chunksCreated: chunksText.length,
+      };
     }
 
     // 4. Marquer le document comme traité
@@ -116,8 +145,15 @@ export class KnowledgeService {
     };
   }
 
-  // Méthode de recherche par similarité cosinus (RAG)
-  async searchSimilarChunks(tenantId: string, query: string, limit = 3): Promise<string[]> {
+  /**
+   * Recherche vectorielle avec score de similarité cosinus (ADR 0002 & ADR 0007)
+   * Exploite l'index HNSW et le pushdown du tenant_id sur document_chunk_vectors.
+   */
+  async searchSimilarChunksWithScores(
+    tenantId: string,
+    query: string,
+    limit = 3,
+  ): Promise<Array<{ content: string; similarity: number }>> {
     try {
       const response = await this.openai.embeddings.create({
         model: 'gemini-embedding-001',
@@ -127,23 +163,59 @@ export class KnowledgeService {
 
       const queryVector = `[${response.data[0].embedding.join(',')}]`;
 
-      // Recherche vectorielle par distance cosinus (<=>) filtrée par Tenant
-      const result: Array<{ content: string }> = await this.prisma.$queryRawUnsafe(
-        `SELECT content 
-         FROM "DocumentChunk"
-         WHERE "tenantId" = $1 AND embedding IS NOT NULL
-         ORDER BY embedding <=> $2::vector
-         LIMIT $3;`,
-        tenantId,
-        queryVector,
-        limit,
-      );
+      // Requête prioritaire sur la table découplée avec pushdown sur v."tenantId"
+      try {
+        const result: Array<{ content: string; similarity: number }> =
+          await this.prisma.$queryRawUnsafe(
+            `SELECT c.content, (1 - (v.embedding <=> $2::vector)) as similarity
+             FROM "document_chunk_vectors" v
+             JOIN "DocumentChunk" c ON c.id = v."chunkId"
+             WHERE v."tenantId" = $1
+             ORDER BY v.embedding <=> $2::vector
+             LIMIT $3;`,
+            tenantId,
+            queryVector,
+            limit,
+          );
 
-      return result.map((r) => r.content);
+        if (result && result.length > 0) {
+          return result.map((r) => ({
+            content: r.content,
+            similarity: Number(r.similarity),
+          }));
+        }
+      } catch (tableErr) {
+        // Fallback si la table découplée n'est pas encore créée dans l'environnement courant
+        console.warn('Table document_chunk_vectors non accessible, fallback sur DocumentChunk', tableErr);
+      }
+
+      // Fallback rétro-compatible sur DocumentChunk direct
+      const fallbackResult: Array<{ content: string }> =
+        await this.prisma.$queryRawUnsafe(
+          `SELECT content 
+           FROM "DocumentChunk"
+           WHERE "tenantId" = $1 AND embedding IS NOT NULL
+           ORDER BY embedding <=> $2::vector
+           LIMIT $3;`,
+          tenantId,
+          queryVector,
+          limit,
+        );
+
+      return fallbackResult.map((r) => ({
+        content: r.content,
+        similarity: 1.0, // Score par défaut en mode fallback
+      }));
     } catch (e) {
       console.error('Erreur de recherche vectorielle:', e);
       return [];
     }
+  }
+
+  // Méthode de recherche par similarité cosinus (RAG)
+  async searchSimilarChunks(tenantId: string, query: string, limit = 3): Promise<string[]> {
+    const scoredChunks = await this.searchSimilarChunksWithScores(tenantId, query, limit);
+    return scoredChunks.map((c) => c.content);
   }
 
   private splitTextIntoChunks(text: string, chunkSize: number): string[] {

@@ -1,0 +1,97 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --canvas: #f8fafc;
+    --surface: #ffffff;
+    --surface-hover: #f1f5f9;
+    --surface-active: #e2e8f0;
+    --border-subtle: rgba(0, 0, 0, 0.08);
+    --border-strong: rgba(0, 0, 0, 0.2);
+
+    --text-primary: #09090b;
+    --text-secondary: #52525b;
+    --text-muted: #71717a;
+
+    --brand: #4f46e5;
+    --brand-hover: #4338ca;
+
+    /* Semantic status */
+    --status-bot: #0284c7;
+    --status-bot-bg: rgba(2, 132, 199, 0.1);
+    --status-pending: #d97706;
+    --status-pending-bg: rgba(217, 119, 6, 0.12);
+    --status-human: #059669;
+    --status-human-bg: rgba(5, 150, 105, 0.12);
+    --status-closed: #64748b;
+    --status-closed-bg: rgba(100, 116, 139, 0.12);
+
+    /* Categories */
+    --cat-bug: #dc2626;
+    --cat-bug-bg: rgba(220, 38, 38, 0.1);
+    --cat-question: #4f46e5;
+    --cat-question-bg: rgba(79, 70, 229, 0.1);
+    --cat-reclamation: #ea580c;
+    --cat-reclamation-bg: rgba(234, 88, 12, 0.1);
+  }
+
+  .dark {
+    --canvas: #09090b;
+    --surface: #111827;
+    --surface-hover: #1f2937;
+    --surface-active: #27272a;
+    --border-subtle: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.18);
+
+    --text-primary: #f4f4f5;
+    --text-secondary: #a1a1aa;
+    --text-muted: #71717a;
+
+    --brand: #6366f1;
+    --brand-hover: #4f46e5;
+
+    /* Semantic status */
+    --status-bot: #38bdf8;
+    --status-bot-bg: rgba(56, 189, 248, 0.12);
+    --status-pending: #fbbf24;
+    --status-pending-bg: rgba(251, 191, 36, 0.14);
+    --status-human: #34d399;
+    --status-human-bg: rgba(52, 211, 153, 0.14);
+    --status-closed: #94a3b8;
+    --status-closed-bg: rgba(148, 163, 184, 0.14);
+
+    /* Categories */
+    --cat-bug: #f87171;
+    --cat-bug-bg: rgba(248, 113, 113, 0.14);
+    --cat-question: #818cf8;
+    --cat-question-bg: rgba(129, 140, 248, 0.14);
+    --cat-reclamation: #fb923c;
+    --cat-reclamation-bg: rgba(251, 146, 60, 0.14);
+  }
+
+  body {
+    background-color: var(--canvas);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Geist Sans", sans-serif;
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* Custom scrollbar for dense data tables and chat */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(150, 150, 150, 0.2);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(150, 150, 150, 0.4);
+}

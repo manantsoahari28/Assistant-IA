@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-30T17:46:30Z",
+  "title": "Design System: Assistant-IA",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Indigo Sapphire",
+        "canonical": "#4F46E5",
+        "tonalRamp": ["#1E1B4B", "#312E81", "#3730A3", "#4338CA", "#4F46E5", "#6366F1", "#818CF8", "#A5B4FC"]
+      },
+      "neutral-bg": {
+        "role": "neutral",
+        "displayName": "Deep Void Canvas",
+        "canonical": "#0B0F19",
+        "tonalRamp": ["#030712", "#0B0F19", "#111827", "#1F2937", "#374151", "#4B5563", "#94A3B8", "#F9FAFB"]
+      },
+      "state-bot": {
+        "role": "state",
+        "displayName": "Autonomous Bot Indigo",
+        "canonical": "#6366F1",
+        "tonalRamp": ["#1E1B4B", "#312E81", "#3730A3", "#4338CA", "#6366F1", "#818CF8", "#A5B4FC", "#C7D2FE"]
+      },
+      "state-pending": {
+        "role": "state",
+        "displayName": "Triage Pending Amber",
+        "canonical": "#F59E0B",
+        "tonalRamp": ["#451A03", "#78350F", "#92400E", "#B45309", "#D97706", "#F59E0B", "#FBBF24", "#FDE68A"]
+      },
+      "state-human": {
+        "role": "state",
+        "displayName": "Counselor Active Emerald",
+        "canonical": "#10B981",
+        "tonalRamp": ["#022C22", "#064E3B", "#065F46", "#047857", "#059669", "#10B981", "#34D399", "#A7F3D0"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Workspace module titles and high-level counters" },
+      "headline": { "displayName": "Headline", "purpose": "Panel headers, drawer titles, customer conversation title" },
+      "title": { "displayName": "Title", "purpose": "Card titles, row labels, section headers" },
+      "body": { "displayName": "Body", "purpose": "Chat message utterances, counselor input" },
+      "label": { "displayName": "Label", "purpose": "Status chips, category badges, table column headers" }
+    },
+    "shadows": [
+      {
+        "name": "surface-overlay",
+        "value": "0 8px 30px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.3)",
+        "purpose": "Dropdowns, popovers, and floating widget drawer"
+      },
+      {
+        "name": "surface-modal",
+        "value": "0 20px 50px rgba(0, 0, 0, 0.65)",
+        "purpose": "High-priority blocking modals"
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out-snappy",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "150ms transition for hover states and button feedback"
+      },
+      {
+        "name": "ease-drawer",
+        "value": "cubic-bezier(0.32, 0.72, 0, 1)",
+        "purpose": "250ms expansion for floating widget and RAG inspector drawer"
+      }
+    ],
+    "breakpoints": [
+      { "name": "mobile", "value": "640px" },
+      { "name": "tablet", "value": "1024px" },
+      { "name": "desktop", "value": "1440px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Takeover Button",
+      "kind": "button",
+      "refersTo": "button-takeover",
+      "description": "Counselor human takeover action in queue and chat header",
+      "html": "<button class=\"ds-btn-takeover\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\"/><circle cx=\"9\" cy=\"7\" r=\"4\"/><polyline points=\"16 11 18 13 22 9\"/></svg>Prendre en main</button>",
+      "css": ".ds-btn-takeover { display: inline-flex; align-items: center; gap: 8px; background: #10B981; color: #FFFFFF; font-size: 13px; font-weight: 600; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; transition: background 0.15s ease; } .ds-btn-takeover:hover { background: #059669; } .ds-btn-takeover:focus-visible { outline: 2px solid #34D399; outline-offset: 2px; }"
+    },
+    {
+      "name": "Triage Pending Chip",
+      "kind": "chip",
+      "refersTo": "chip-status",
+      "description": "Indicator for conversations awaiting human counselor claim",
+      "html": "<span class=\"ds-chip-pending\"><span class=\"ds-dot\"></span>EN ATTENTE AGENT</span>",
+      "css": ".ds-chip-pending { display: inline-flex; align-items: center; gap: 6px; background: rgba(245, 158, 11, 0.15); color: #F59E0B; border: 1px solid rgba(245, 158, 11, 0.35); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; padding: 2px 8px; border-radius: 9999px; } .ds-chip-pending .ds-dot { width: 6px; height: 6px; background: #F59E0B; border-radius: 50%; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Mission Control Dispatcher",
+    "overview": "Assistant-IA's visual system embodies the calm, unyielding precision of an air traffic control console or financial trading terminal. In an enterprise customer support environment, counselors operate under high cognitive throughput: reviewing customer grievances, inspecting AI-retrieved source chunks, claiming escalated threads, and composing decisive replies.",
+    "keyCharacteristics": [
+      "Zero-Tolerance Anti-Slop: No purple neon gradients, sparkles, or fake progress rings",
+      "Strict Semantic Lifecycle Chromatics (BOT indigo, PENDING_HUMAN amber, HUMAN_ACTIVE emerald, CLOSED slate)",
+      "Tabular & Monospace Rigor for timestamps, token meters, and chunk coordinates",
+      "Tonal Layering over Heavy Drops: 1px structural borders and subtle elevation"
+    ],
+    "rules": [
+      { "name": "The Restrained Accent Rule", "body": "Primary accent (#4F46E5) must cover less than 8% of any rendered viewport.", "section": "colors" },
+      { "name": "The State Tint Rule", "body": "Lifecycle states must pair their primary text color with a 12% opacity wash of the exact same hue.", "section": "colors" },
+      { "name": "The Single-Sans Discipline Rule", "body": "Never combine distinct display and body sans-serif typefaces. The entire operational interface uses Inter.", "section": "typography" },
+      { "name": "The Numeric Tabular Rule", "body": "Every timestamp, duration, and quantitative metric must render with font-variant-numeric: tabular-nums.", "section": "typography" },
+      { "name": "The Elevation-By-State Rule", "body": "Shadows must never appear on resting static elements, only on floating overlays.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do format all timestamps and metrics with monospace or tabular numbers",
+      "Do display the exact RAG chunk citations that generated an autonomous response",
+      "Do maintain a strict 4.5:1 minimum contrast ratio across all text and icon indicators"
+    ],
+    "donts": [
+      "Don't use purple-to-pink gradient text, pulsing neon glows, or glowing robot avatars",
+      "Don't nest cards inside cards; use typographic hierarchy and 1px dividers",
+      "Don't place eyebrow kickers above main headings"
+    ]
+  }
+}

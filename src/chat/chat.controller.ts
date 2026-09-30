@@ -86,6 +86,17 @@ Si l'IA ne trouve pas la réponse dans la base de connaissances, elle déclenche
     return this.chatService.getConversations(tenant, ConversationStatus.PENDING_HUMAN);
   }
 
+  @Get('analytics')
+  @ApiOperation({
+    summary: 'Tableau de bord et statistiques des demandes fréquentes (Sujet 4)',
+    description: 'Retourne les métriques globales : répartition par statut, volume par catégorie (BUG, QUESTION, RECLAMATION), messages et tokens.',
+  })
+  @ApiResponse({ status: 200, description: 'Statistiques du tableau de bord' })
+  @ApiResponse({ status: 401, description: 'Clé API manquante ou invalide' })
+  async getAnalytics(@CurrentTenant() tenant: Tenant) {
+    return this.chatService.getAnalytics(tenant);
+  }
+
   @Get('conversations/:id')
   @ApiOperation({
     summary: 'Historique complet d\'une conversation',

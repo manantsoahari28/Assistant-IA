@@ -1,13 +1,15 @@
 
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
-
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+  extensions = [vector]
 }
 
 // 1. ENTREPRISES (TENANTS)
@@ -19,10 +21,11 @@ model Tenant {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  documents     KnowledgeBaseDocument[]
-  conversations Conversation[]
-  messages      Message[]
-  chunks        DocumentChunk[]
+  documents            KnowledgeBaseDocument[]
+  conversations        Conversation[]
+  messages             Message[]
+  chunks               DocumentChunk[]
+  documentChunkVectors DocumentChunkVector[]
 }
 
 // 2. BASE DE CONNAISSANCE (RAG)
@@ -52,21 +55,41 @@ model DocumentChunk {
   documentId String
   document   KnowledgeBaseDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
   content    String
+  embedding  Unsupported("vector(768)")?
   createdAt  DateTime              @default(now())
+
+  vector DocumentChunkVector?
 
   @@index([tenantId])
 }
 
+// 3b. TABLE DÉCOUPLÉE POUR LES VECTEURS (ADR 0002 & ADR 0007)
+model DocumentChunkVector {
+  id        String                @id @default(uuid())
+  tenantId  String
+  tenant    Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  chunkId   String                @unique
+  chunk     DocumentChunk         @relation(fields: [chunkId], references: [id], onDelete: Cascade)
+  embedding Unsupported("vector(768)")
+  createdAt DateTime              @default(now())
+
+  @@index([tenantId])
+  @@map("document_chunk_vectors")
+}
+
 // 4. CONVERSATIONS
 model Conversation {
-  id             String             @id @default(uuid())
-  tenantId       String
-  tenant         Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  userExternalId String?
-  category       Category?
-  status         ConversationStatus @default(BOT)
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
+  id                   String             @id @default(uuid())
+  tenantId             String
+  tenant               Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userExternalId       String?
+  category             Category?
+  status               ConversationStatus @default(BOT)
+  parentConversationId String?
+  parentConversation   Conversation?      @relation("ConversationHierarchy", fields: [parentConversationId], references: [id])
+  childConversations   Conversation[]     @relation("ConversationHierarchy")
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
 
   messages Message[]
 
@@ -84,6 +107,7 @@ enum ConversationStatus {
   BOT
   PENDING_HUMAN
   HUMAN_ACTIVE
+  RESOLVED
   CLOSED
 }
 

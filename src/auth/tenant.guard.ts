@@ -5,6 +5,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -15,14 +16,24 @@ export class TenantGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const apiKey = request.headers['x-api-key'];
 
-    if (!apiKey) {
+    if (!apiKey || typeof apiKey !== 'string') {
       throw new UnauthorizedException('Clé API manquante (en-tête x-api-key requis)');
     }
 
-    // Recherche de l'entreprise associée à la clé API
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { apiKeyHash: apiKey },
+    // Calcul du hash SHA-256 de la clé API
+    const hashedKey = crypto.createHash('sha256').update(apiKey).digest('hex');
+
+    // Recherche de l'entreprise associée au hash de la clé API
+    let tenant = await this.prisma.tenant.findUnique({
+      where: { apiKeyHash: hashedKey },
     });
+
+    // Rétrocompatibilité : prise en charge des clés existantes non hashées (ex: seed initial)
+    if (!tenant) {
+      tenant = await this.prisma.tenant.findUnique({
+        where: { apiKeyHash: apiKey },
+      });
+    }
 
     if (!tenant) {
       throw new UnauthorizedException('Clé API invalide');

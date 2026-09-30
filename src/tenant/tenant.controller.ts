@@ -4,6 +4,7 @@ import {
   Controller,
   Get,
   Patch,
+  Post,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -80,5 +81,27 @@ export class TenantController {
     @Body() dto: UpdateTenantDto,
   ) {
     return this.tenantService.updateSettings(tenant.id, dto);
+  }
+
+  @Post('rotate-api-key')
+  @ApiOperation({
+    summary: 'Régénérer une nouvelle clé API pour le tenant',
+    description: 'Invalide la clé précédente, génère une nouvelle clé aléatoire cryptographiquement sûre, et la retourne en clair une seule et unique fois.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Nouvelle clé API générée avec succès',
+    schema: {
+      example: {
+        message: 'Clé API régénérée avec succès. Conservez-la en lieu sûr, elle ne sera plus jamais réaffichée.',
+        apiKey: 'sk_live_9f81a7b8c2d1e0f...',
+        apiKeyPreview: 'sk_...0f1a',
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Clé API manquante ou invalide' })
+  @ApiResponse({ status: 404, description: 'Tenant introuvable' })
+  async rotateApiKey(@CurrentTenant() tenant: Tenant) {
+    return this.tenantService.rotateApiKey(tenant.id);
   }
 }

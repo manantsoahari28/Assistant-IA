@@ -104,7 +104,88 @@ export class ChatService {
     // ÉTAT 1 : BOT (L'IA répond automatiquement)
     // =========================================================================
 
-    // Sauvegarde du message de l'utilisateur
+    // 1. Cycle de vie : Expiration paresseuse (Lazy Evaluation) de RESOLVED vers CLOSED après 24h
+    if (conversation.status === ConversationStatus.RESOLVED) {
+      const ageMs = Date.now() - new Date(conversation.updatedAt).getTime();
+      const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+      if (ageMs > TWENTY_FOUR_HOURS_MS) {
+        conversation = await this.prisma.conversation.update({
+          where: { id: conversation.id },
+          data: { status: ConversationStatus.CLOSED, updatedAt: new Date() },
+        });
+      }
+    }
+
+    // 2. Si la conversation est définitivement fermée (CLOSED), elle est immuable (ADR 0004).
+    // Tout nouveau message instancie une nouvelle Conversation liée (parentConversationId).
+    if (conversation.status === ConversationStatus.CLOSED) {
+      conversation = await this.prisma.conversation.create({
+        data: {
+          tenantId: tenant.id,
+          userExternalId: conversation.userExternalId,
+          category: conversation.category,
+          status: ConversationStatus.BOT,
+          parentConversationId: conversation.id,
+        },
+      });
+    }
+
+    // 3. Gestion de l'état RESOLVED (dans la période de grâce de 24h)
+    // Filtre de politesse hybride (ADR 0006)
+    if (conversation.status === ConversationStatus.RESOLVED) {
+      const isCourtesy = this.isShortCourtesyMessage(dto.message);
+      if (isCourtesy) {
+        // Enregistrer le message du client
+        await this.prisma.message.create({
+          data: {
+            tenantId: tenant.id,
+            conversationId: conversation.id,
+            role: 'USER',
+            content: dto.message,
+          },
+        });
+
+        const softAckReply =
+          "Je vous en prie ! Ravi d'avoir pu vous aider. N'hésitez pas si vous avez d'autres questions. Passez une excellente journée !";
+
+        const botMsg = await this.prisma.message.create({
+          data: {
+            tenantId: tenant.id,
+            conversationId: conversation.id,
+            role: 'ASSISTANT',
+            content: softAckReply,
+          },
+        });
+
+        // La conversation reste RESOLVED avec horodatage rafraîchi
+        await this.prisma.conversation.update({
+          where: { id: conversation.id },
+          data: { updatedAt: new Date() },
+        });
+
+        return {
+          conversationId: conversation.id,
+          status: ConversationStatus.RESOLVED,
+          reply: softAckReply,
+          messageId: botMsg.id,
+          handoff: false,
+        };
+      }
+
+      // Si ce n'est pas une simple formule de politesse, le client pose un nouveau problème : réouverture en BOT
+      const reopened = await this.prisma.conversation.update({
+        where: { id: conversation.id },
+        data: {
+          status: ConversationStatus.BOT,
+          updatedAt: new Date(),
+        },
+      });
+      if (reopened) {
+        conversation = reopened;
+      }
+    }
+
+    // 4. Sauvegarde du message de l'utilisateur
     await this.prisma.message.create({
       data: {
         tenantId: tenant.id,
@@ -114,7 +195,7 @@ export class ChatService {
       },
     });
 
-    // Cas A : L'utilisateur demande explicitement un agent humain
+    // 5. Cas A : L'utilisateur demande explicitement un agent humain (Regex pré-LLM, latence 0ms)
     const userWantsHuman = dto.requestHuman || this.detectHumanRequest(dto.message);
     if (userWantsHuman) {
       await this.prisma.conversation.update({
@@ -131,7 +212,11 @@ export class ChatService {
           conversationId: conversation.id,
           role: 'ASSISTANT',
           content: escalationReply,
-          metadata: { handoff: true, reason: 'USER_REQUEST' },
+          metadata: {
+            handoff: true,
+            reason: 'USER_REQUEST',
+            counselorSummary: `Demande explicite de conseiller par le client : "${dto.message}"`,
+          },
         },
       });
 
@@ -144,71 +229,209 @@ export class ChatService {
       };
     }
 
-    // Cas B : Traitement classique via RAG et Gemini
-    const history = await this.prisma.message.findMany({
-      where: { conversationId: conversation.id },
-      orderBy: { createdAt: 'asc' },
-      take: 10,
-    });
+    // 6. Cas B : RAG avec score de similarité cosinus & Garde-fou déterministe (ADR 0003)
+    const scoredChunks = await this.knowledgeService.searchSimilarChunksWithScores(
+      tenant.id,
+      dto.message,
+      3,
+    );
+    const maxSimilarity =
+      scoredChunks.length > 0
+        ? Math.max(...scoredChunks.map((c) => c.similarity))
+        : 0;
 
-    const contextChunks = await this.knowledgeService.searchSimilarChunks(tenant.id, dto.message);
-    const contextText =
-      contextChunks.length > 0
-        ? `\n\nContexte extrait de la base de connaissances:\n${contextChunks.join('\n---\n')}`
-        : '';
-
-    // Directive d'escalade : si l'IA ne sait pas, elle émet la balise [ESCALATE_TO_HUMAN]
-    const escalationInstruction =
-      `\n\nCONSIGNE STRICTE : Base tes réponses uniquement sur les informations vérifiées issues du contexte fourni ci-dessus. Si le contexte ne te permet pas de répondre précisément à la demande du client, ou si tu ne trouves pas l'information, réponds poliment que tu ne disposes pas de ces données et termine obligatoirement avec la balise [ESCALATE_TO_HUMAN] pour déclencher le transfert vers un agent humain.`;
-
-    const systemPrompt =
-      (tenant.botSystemPrompt || 'Tu es un assistant support client professionnel et courtois.') +
-      contextText +
-      escalationInstruction;
-
-    const formattedMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-      { role: 'system', content: systemPrompt },
-      ...history.map((msg) => ({
-        role: (msg.role === 'USER' ? 'user' : 'assistant') as 'user' | 'assistant',
-        content: msg.content,
-      })),
-    ];
-
-    let aiResponseText = '';
-    try {
-      const response = await this.openai.chat.completions.create({
-        model: 'gemini-3.1-flash-lite',
-        messages: formattedMessages,
-      });
-      aiResponseText =
-        response.choices[0]?.message?.content || 'Désolé, aucune réponse générée.';
-    } catch (error) {
-      console.error('Erreur API Gemini:', error);
-      aiResponseText = 'Désolé, une erreur technique est survenue.';
-    }
-
-    // Cas C : L'IA n'a pas trouvé la réponse ou a déclenché l'escalade
-    const aiEscalated = this.detectAiEscalation(aiResponseText, contextChunks.length === 0);
-
-    if (aiEscalated) {
+    // Si aucun document pertinent n'est disponible (score < 0.55), escalade immédiate sans hallucination
+    if (scoredChunks.length === 0 || maxSimilarity < 0.55) {
       await this.prisma.conversation.update({
         where: { id: conversation.id },
         data: { status: ConversationStatus.PENDING_HUMAN },
       });
 
-      // Nettoyer la balise technique avant restitution au client
-      let cleanReply = aiResponseText.replace(/\[ESCALATE_TO_HUMAN\]/gi, '').trim();
-      if (!cleanReply || cleanReply.length < 5) {
-        cleanReply =
-          "Je n'ai pas trouvé la réponse dans ma base de connaissances. Je transmets votre conversation à un conseiller humain.";
-      } else if (
-        !cleanReply.toLowerCase().includes('humain') &&
-        !cleanReply.toLowerCase().includes('conseiller') &&
-        !cleanReply.toLowerCase().includes('agent')
-      ) {
-        cleanReply +=
-          "\n\nJe passe votre demande en attente d'un conseiller humain qui prendra le relais sous peu.";
+      const safetyNotice =
+        "Je ne dispose pas d'informations suffisantes dans ma base de connaissances pour vous répondre avec précision. Je passe votre demande à un conseiller humain qui prendra le relais.";
+
+      const botMessage = await this.prisma.message.create({
+        data: {
+          tenantId: tenant.id,
+          conversationId: conversation.id,
+          role: 'ASSISTANT',
+          content: safetyNotice,
+          metadata: {
+            handoff: true,
+            reason: 'KNOWLEDGE_GAP',
+            counselorSummary: `Absence de document pertinent (score max: ${maxSimilarity.toFixed(2)}). Question client : "${dto.message}"`,
+          },
+        },
+      });
+
+      return {
+        conversationId: conversation.id,
+        status: ConversationStatus.PENDING_HUMAN,
+        reply: safetyNotice,
+        messageId: botMessage.id,
+        handoff: true,
+      };
+    }
+
+    // 7. Cas C : Assemblage mémoire Head + Tail (ADR 0004)
+    const contextText = `\n\nContexte extrait de la base de connaissances:\n${scoredChunks.map((c) => c.content).join('\n---\n')}`;
+
+    const systemPrompt =
+      (tenant.botSystemPrompt || 'Tu es un assistant support client professionnel et courtois.') +
+      contextText +
+      `\n\nCONSIGNE STRICTE : Si les informations du contexte ne permettent pas de répondre précisément à la demande du client, appelle obligatoirement la fonction escalate_to_counselor.`;
+
+    const allHistory = await this.prisma.message.findMany({
+      where: {
+        conversationId: conversation.id,
+        role: { not: 'SYSTEM' },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const formattedMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+      { role: 'system', content: systemPrompt },
+    ];
+
+    if (allHistory.length <= 12) {
+      for (const msg of allHistory) {
+        formattedMessages.push({
+          role: (msg.role === 'USER' ? 'user' : 'assistant') as 'user' | 'assistant',
+          content: msg.content,
+        });
       }
+    } else {
+      // Préservation de l'Ancre (Message 1) avec troncature médiane intelligente
+      const anchorMsg = allHistory[0];
+      const anchorContent = this.formatAnchorContent(anchorMsg.content);
+      formattedMessages.push({
+        role: (anchorMsg.role === 'USER' ? 'user' : 'assistant') as 'user' | 'assistant',
+        content: anchorContent,
+      });
+
+      formattedMessages.push({
+        role: 'system',
+        content: '[Historique intermédiaire condensé : échanges précédents omis pour concision]',
+      });
+
+      const recentTail = allHistory.slice(-10);
+      for (const msg of recentTail) {
+        formattedMessages.push({
+          role: (msg.role === 'USER' ? 'user' : 'assistant') as 'user' | 'assistant',
+          content: msg.content,
+        });
+      }
+    }
+
+    // 8. Outils natifs Gemini (Tool Calling)
+    const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
+      {
+        type: 'function',
+        function: {
+          name: 'escalate_to_counselor',
+          description:
+            "Transférer la conversation à un conseiller humain lorsque l'information est introuvable, incertaine ou requiert une action manuelle.",
+          parameters: {
+            type: 'object',
+            properties: {
+              reason: {
+                type: 'string',
+                enum: [
+                  'KNOWLEDGE_GAP',
+                  'COMPLEX_INQUIRY',
+                  'CUSTOMER_FRUSTRATION',
+                  'RESTRICTED_OPERATION',
+                ],
+                description: 'Raison motivant le transfert vers un conseiller humain.',
+              },
+              counselorSummary: {
+                type: 'string',
+                description:
+                  'Synthèse concise de 2 phrases de la situation destinée au conseiller support dans son interface de travail.',
+              },
+              publicCustomerMessage: {
+                type: 'string',
+                description:
+                  "Message courtois et rassurant destiné au client l'informant du transfert vers un conseiller.",
+              },
+            },
+            required: ['reason', 'counselorSummary', 'publicCustomerMessage'],
+          },
+        },
+      },
+    ];
+
+    let responseMessage: OpenAI.Chat.Completions.ChatCompletionMessage | null = null;
+    try {
+      const response = await this.openai.chat.completions.create({
+        model: 'gemini-3.1-flash-lite',
+        messages: formattedMessages,
+        tools,
+        tool_choice: 'auto',
+      });
+      responseMessage = response.choices[0]?.message || null;
+    } catch (error) {
+      console.error('Erreur API Gemini:', error);
+    }
+
+    // Vérifier si le modèle a appelé l'outil d'escalade
+    const toolCall = responseMessage?.tool_calls?.find(
+      (tc) => tc.type === 'function' && tc.function?.name === 'escalate_to_counselor',
+    );
+
+    if (toolCall && toolCall.type === 'function') {
+      let reason = 'KNOWLEDGE_GAP';
+      let counselorSummary = "Escalade automatique demandée par l'assistant IA.";
+      let publicCustomerMessage =
+        'Je passe votre demande à un conseiller humain qui prendra le relais sous peu.';
+
+      try {
+        const parsedArgs = JSON.parse(toolCall.function.arguments);
+        if (parsedArgs.reason) reason = parsedArgs.reason;
+        if (parsedArgs.counselorSummary) counselorSummary = parsedArgs.counselorSummary;
+        if (parsedArgs.publicCustomerMessage) publicCustomerMessage = parsedArgs.publicCustomerMessage;
+      } catch (jsonErr) {
+        console.warn('Échec parsing arguments tool_call escalate_to_counselor', jsonErr);
+      }
+
+      await this.prisma.conversation.update({
+        where: { id: conversation.id },
+        data: { status: ConversationStatus.PENDING_HUMAN },
+      });
+
+      const botMessage = await this.prisma.message.create({
+        data: {
+          tenantId: tenant.id,
+          conversationId: conversation.id,
+          role: 'ASSISTANT',
+          content: publicCustomerMessage,
+          metadata: {
+            handoff: true,
+            reason,
+            counselorSummary,
+          },
+        },
+      });
+
+      return {
+        conversationId: conversation.id,
+        status: ConversationStatus.PENDING_HUMAN,
+        reply: publicCustomerMessage,
+        messageId: botMessage.id,
+        handoff: true,
+      };
+    }
+
+    // Vérifier si le texte contient l'ancienne balise technique par précaution
+    const aiContent = responseMessage?.content || 'Désolé, aucune réponse générée.';
+    if (this.detectAiEscalation(aiContent, false)) {
+      await this.prisma.conversation.update({
+        where: { id: conversation.id },
+        data: { status: ConversationStatus.PENDING_HUMAN },
+      });
+
+      const cleanReply = aiContent.replace(/\[ESCALATE_TO_HUMAN\]/gi, '').trim() ||
+        'Je transmets votre demande à un conseiller humain.';
 
       const botMessage = await this.prisma.message.create({
         data: {
@@ -235,15 +458,16 @@ export class ChatService {
         tenantId: tenant.id,
         conversationId: conversation.id,
         role: 'ASSISTANT',
-        content: aiResponseText,
+        content: aiContent,
       },
     });
 
     return {
       conversationId: conversation.id,
       status: ConversationStatus.BOT,
-      reply: aiResponseText,
+      reply: aiContent,
       messageId: botMessage.id,
+      handoff: false,
     };
   }
 
@@ -374,6 +598,7 @@ export class ChatService {
 
   /**
    * Résoudre ou repasser la conversation au BOT
+   * Note : La résolution applique le statut canonique RESOLVED (ADR 0006).
    */
   async resolveConversation(tenant: Tenant, conversationId: string, returnToBot = false) {
     const conversation = await this.prisma.conversation.findFirst({
@@ -384,7 +609,7 @@ export class ChatService {
       throw new NotFoundException('Conversation introuvable');
     }
 
-    const newStatus = returnToBot ? ConversationStatus.BOT : ConversationStatus.CLOSED;
+    const newStatus = returnToBot ? ConversationStatus.BOT : ConversationStatus.RESOLVED;
 
     const updated = await this.prisma.conversation.update({
       where: { id: conversationId },
@@ -393,7 +618,7 @@ export class ChatService {
 
     const infoNotice = returnToBot
       ? "La conversation a été retransférée à l'assistant virtuel (BOT)."
-      : 'La conversation a été clôturée par le conseiller.';
+      : 'La conversation a été marquée comme résolue (RESOLVED) par le conseiller. Période de grâce de 24h activée.';
 
     await this.prisma.message.create({
       data: {
@@ -440,6 +665,33 @@ export class ChatService {
   // =========================================================================
 
   /**
+   * Détecte si le message est une formule de politesse courte de clôture (ADR 0006)
+   */
+  private isShortCourtesyMessage(message: string): boolean {
+    const clean = message.trim().toLowerCase();
+    if (clean.length > 70) return false;
+
+    const courtesyPatterns = [
+      /^(merci(\s+(beaucoup|infiniment|bien))?(\s+(pour|d['’])\s+(tout|votre\s+aide|votre\s+retour|votre\s+réactivité|l['’]aide))?|merci\s+[àa]\s+(vous|toi)|re-merci|super|parfait|nickel|top|impeccable|genial|génial)[. !]*$/i,
+      /^(bonne\s+journée|bonne\s+soiree|bonne\s+soirée|bon\s+weekend|bon\s+week-end|au\s+revoir|a\s+bientot|à\s+bientôt)[. !]*$/i,
+      /^(c['’]est\s+(bon|parfait|noté|regle|réglé|tout\s+bon)|tout\s+est\s+(bon|ok|clair|parfait))[. !]*$/i,
+      /^(thanks|thank\s+you(\s+(very\s+much|for\s+your\s+help|for\s+everything))?|great|perfect|awesome|bye|have\s+a\s+(good|great|nice)\s+day)[. !]*$/i,
+    ];
+
+    return courtesyPatterns.some((pattern) => pattern.test(clean));
+  }
+
+  /**
+   * Troncature médiane intelligente pour l'Ancre (Message 1) si supérieure à maxChars (ADR 0004)
+   */
+  private formatAnchorContent(content: string, maxChars = 3200): string {
+    if (content.length <= maxChars) return content;
+    const headPart = content.slice(0, 1600);
+    const tailPart = content.slice(-800);
+    return `${headPart}\n\n[... Demande initiale tronquée pour concision ...]\n\n${tailPart}`;
+  }
+
+  /**
    * Détecte si le message de l'utilisateur exprime l'envie de parler à un humain
    */
   private detectHumanRequest(message: string): boolean {
@@ -475,7 +727,78 @@ export class ChatService {
       /transférer.*(conseiller|agent|humain)/i,
     ];
 
-    // Si aucun contexte RAG et l'IA exprime son impossibilité de répondre
     return notFoundPatterns.some((pattern) => pattern.test(normalized));
   }
-}
+
+  /**
+   * Tableau de bord des statistiques et demandes les plus fréquentes (Sujet 4)
+   */
+  async getAnalytics(tenant: Tenant) {
+    const [
+      totalConversations,
+      statusCounts,
+      categoryCounts,
+      totalMessages,
+      tokenStats,
+      totalDocuments,
+    ] = await Promise.all([
+      this.prisma.conversation.count({
+        where: { tenantId: tenant.id },
+      }),
+      this.prisma.conversation.groupBy({
+        by: ['status'],
+        where: { tenantId: tenant.id },
+        _count: { id: true },
+      }),
+      this.prisma.conversation.groupBy({
+        by: ['category'],
+        where: { tenantId: tenant.id },
+        _count: { id: true },
+      }),
+      this.prisma.message.count({
+        where: { tenantId: tenant.id },
+      }),
+      this.prisma.message.aggregate({
+        where: { tenantId: tenant.id },
+        _sum: { tokensUsed: true },
+      }),
+      this.prisma.knowledgeBaseDocument.count({
+        where: { tenantId: tenant.id },
+      }),
+    ]);
+
+    const categories: Record<string, number> = {
+      BUG: 0,
+      QUESTION: 0,
+      RECLAMATION: 0,
+      UNCLASSIFIED: 0,
+    };
+    categoryCounts.forEach((c: { category: string | null; _count: { id: number } }) => {
+      if (c.category) {
+        categories[c.category] = c._count.id;
+      } else {
+        categories.UNCLASSIFIED += c._count.id;
+      }
+    });
+
+    const statuses: Record<ConversationStatus, number> = {
+      BOT: 0,
+      PENDING_HUMAN: 0,
+      HUMAN_ACTIVE: 0,
+      RESOLVED: 0,
+      CLOSED: 0,
+    };
+    statusCounts.forEach((s: { status: ConversationStatus; _count: { id: number } }) => {
+      statuses[s.status] = s._count.id;
+    });
+
+    return {
+      totalConversations,
+      totalMessages,
+      totalDocuments,
+      totalTokensUsed: tokenStats._sum.tokensUsed || 0,
+      statuses,
+      categories,
+    };
+  }
+}

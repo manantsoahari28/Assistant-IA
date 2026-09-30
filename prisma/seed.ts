@@ -1,14 +1,18 @@
 import { PrismaClient } from '@prisma/client';
+import * as crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
 async function main() {
+  const apiKey = 'cle-api-test-123';
+  const apiKeyHash = crypto.createHash('sha256').update(apiKey).digest('hex');
+
   const tenant = await prisma.tenant.upsert({
-    where: { apiKeyHash: 'cle-api-test-123' },
+    where: { apiKeyHash },
     update: {},
     create: {
       name: 'Entreprise De Démo',
-      apiKeyHash: 'cle-api-test-123', // En production, cette clé sera hashée
+      apiKeyHash,
       botSystemPrompt: 'Tu es un assistant de support client professionnel, courtois et concis.',
     },
   });

@@ -1,6 +1,5 @@
-// src/tenant/dto/update-tenant.dto.ts
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString } from 'class-validator';
+import { IsOptional, IsString, ValidateIf } from 'class-validator';
 
 export class UpdateTenantDto {
   @ApiPropertyOptional({
@@ -14,8 +13,10 @@ export class UpdateTenantDto {
   @ApiPropertyOptional({
     description: 'Prompt système du bot IA (instructions de personnalité et de comportement)',
     example: 'Tu es un assistant IA expert en support technique, réponds toujours de manière concise et professionnelle.',
+    nullable: true,
   })
+  @ValidateIf((_, value) => value !== null)
   @IsString()
   @IsOptional()
-  botSystemPrompt?: string;
+  botSystemPrompt?: string | null;
 }
