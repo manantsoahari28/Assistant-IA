@@ -126,15 +126,15 @@ export const DashboardView: React.FC = () => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-[var(--text-secondary)]">
-              Total Conversations
+              Total Demandes
             </CardTitle>
             <Users className="h-4 w-4 text-indigo-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-mono">
+            <div className="text-2xl font-semibold tracking-tight tabular-nums">
               {data?.totalConversations || 0}
             </div>
-            <p className="text-xs text-[var(--text-muted)] mt-1">
+            <p className="text-xs text-[var(--text-muted)] mt-1 tabular-nums">
               {data?.totalMessages || 0} messages échangés
             </p>
           </CardContent>
@@ -143,16 +143,16 @@ export const DashboardView: React.FC = () => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-[var(--text-secondary)]">
-              En attente Conseiller
+              File Conseiller
             </CardTitle>
-            <Clock className="h-4 w-4 text-amber-400" />
+            <Clock className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-mono text-amber-400">
+            <div className="text-2xl font-semibold tracking-tight tabular-nums text-amber-500">
               {data?.statuses.PENDING_HUMAN || 0}
             </div>
             <p className="text-xs text-[var(--text-muted)] mt-1">
-              Escalades humaines actives
+              Escalades à traiter
             </p>
           </CardContent>
         </Card>
@@ -160,16 +160,16 @@ export const DashboardView: React.FC = () => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-[var(--text-secondary)]">
-              Résolus par l'IA (BOT)
+              Résolution Immédiate
             </CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-mono text-emerald-400">
+            <div className="text-2xl font-semibold tracking-tight tabular-nums text-emerald-500">
               {data?.statuses.BOT || 0}
             </div>
             <p className="text-xs text-[var(--text-muted)] mt-1">
-              Traitement 100% autonome
+              Traitement automatique
             </p>
           </CardContent>
         </Card>
@@ -177,16 +177,16 @@ export const DashboardView: React.FC = () => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-[var(--text-secondary)]">
-              Documents RAG
+              Base Documentaire
             </CardTitle>
-            <FileText className="h-4 w-4 text-cyan-400" />
+            <FileText className="h-4 w-4 text-indigo-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-mono text-cyan-400">
+            <div className="text-2xl font-semibold tracking-tight tabular-nums text-indigo-400">
               {data?.totalDocuments || 0}
             </div>
             <p className="text-xs text-[var(--text-muted)] mt-1">
-              Base vectorielle pgvector
+              Articles actifs indexés
             </p>
           </CardContent>
         </Card>
@@ -200,11 +200,11 @@ export const DashboardView: React.FC = () => {
             <div className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-indigo-400" />
               <CardTitle className="text-base">
-                Répartition des Catégories de Demandes
+                Répartition des Demandes par Motif
               </CardTitle>
             </div>
             <CardDescription>
-              Classification automatique opérée par l'API sur chaque échange
+              Ventilation par intention détectée lors des échanges clients
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
@@ -215,11 +215,11 @@ export const DashboardView: React.FC = () => {
                   <HelpCircle className="h-4 w-4 text-indigo-400" />
                   Questions & Renseignements
                 </span>
-                <span className="font-mono text-xs text-[var(--text-secondary)]">
+                <span className="text-xs text-[var(--text-secondary)] tabular-nums">
                   {data?.categories.QUESTION || 0} ({getPercent(data?.categories.QUESTION || 0)}%)
                 </span>
               </div>
-              <div className="h-2.5 w-full bg-[var(--surface-hover)] rounded-full overflow-hidden">
+              <div className="h-2 w-full bg-[var(--surface-hover)] rounded-full overflow-hidden">
                 <div
                   className="h-full bg-indigo-500 rounded-full transition-all duration-500"
                   style={{ width: `${getPercent(data?.categories.QUESTION || 0)}%` }}
@@ -232,13 +232,13 @@ export const DashboardView: React.FC = () => {
               <div className="flex justify-between items-center text-sm mb-1.5">
                 <span className="flex items-center gap-2 font-medium">
                   <Bug className="h-4 w-4 text-red-400" />
-                  Bugs & Incidents Techniques
+                  Incidents Techniques
                 </span>
-                <span className="font-mono text-xs text-[var(--text-secondary)]">
+                <span className="text-xs text-[var(--text-secondary)] tabular-nums">
                   {data?.categories.BUG || 0} ({getPercent(data?.categories.BUG || 0)}%)
                 </span>
               </div>
-              <div className="h-2.5 w-full bg-[var(--surface-hover)] rounded-full overflow-hidden">
+              <div className="h-2 w-full bg-[var(--surface-hover)] rounded-full overflow-hidden">
                 <div
                   className="h-full bg-red-500 rounded-full transition-all duration-500"
                   style={{ width: `${getPercent(data?.categories.BUG || 0)}%` }}
@@ -251,14 +251,14 @@ export const DashboardView: React.FC = () => {
               <div className="flex justify-between items-center text-sm mb-1.5">
                 <span className="flex items-center gap-2 font-medium">
                   <AlertTriangle className="h-4 w-4 text-orange-400" />
-                  Réclamations & Litiges
+                  Réclamations & Commandes
                 </span>
-                <span className="font-mono text-xs text-[var(--text-secondary)]">
+                <span className="text-xs text-[var(--text-secondary)] tabular-nums">
                   {data?.categories.RECLAMATION || 0} (
                   {getPercent(data?.categories.RECLAMATION || 0)}%)
                 </span>
               </div>
-              <div className="h-2.5 w-full bg-[var(--surface-hover)] rounded-full overflow-hidden">
+              <div className="h-2 w-full bg-[var(--surface-hover)] rounded-full overflow-hidden">
                 <div
                   className="h-full bg-orange-500 rounded-full transition-all duration-500"
                   style={{ width: `${getPercent(data?.categories.RECLAMATION || 0)}%` }}
@@ -271,14 +271,14 @@ export const DashboardView: React.FC = () => {
               <div>
                 <div className="flex justify-between items-center text-sm mb-1.5">
                   <span className="flex items-center gap-2 font-medium text-[var(--text-secondary)]">
-                    Non classifié
+                    Autres demandes
                   </span>
-                  <span className="font-mono text-xs text-[var(--text-muted)]">
+                  <span className="text-xs text-[var(--text-muted)] tabular-nums">
                     {data?.categories.UNCLASSIFIED} (
                     {getPercent(data?.categories.UNCLASSIFIED || 0)}%)
                   </span>
                 </div>
-                <div className="h-2.5 w-full bg-[var(--surface-hover)] rounded-full overflow-hidden">
+                <div className="h-2 w-full bg-[var(--surface-hover)] rounded-full overflow-hidden">
                   <div
                     className="h-full bg-slate-500 rounded-full transition-all duration-500"
                     style={{
@@ -297,43 +297,43 @@ export const DashboardView: React.FC = () => {
             <div className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-indigo-400" />
               <CardTitle className="text-base">
-                Sujets & Demandes les Plus Fréquents
+                Thématiques Récurrentes
               </CardTitle>
             </div>
             <CardDescription>
-              Thématiques identifiées par l'analyse sémantique des chunks RAG
+              Motifs d'échange les plus observés sur les derniers jours
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3.5">
+            <div className="space-y-3">
               {[
                 {
-                  topic: 'Politique de Retour & Délais de Rétractation (30 jours)',
+                  topic: 'Politique de retour & délais de rétractation (30 jours)',
                   freq: 'Élevée',
                   category: 'QUESTION',
                   badgeColor: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
-                  matches: '96% pertinence RAG',
+                  matches: 'Documentation validée',
                 },
                 {
                   topic: 'Colis endommagé à la livraison / Écran fêlé',
-                  freq: 'Critique',
+                  freq: 'Prioritaire',
                   category: 'RECLAMATION',
                   badgeColor: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
-                  matches: 'Escalade conseiller requise',
+                  matches: 'Escalade conseiller systématique',
                 },
                 {
-                  topic: 'Erreur 500 lors de la validation du panier',
+                  topic: 'Erreur technique lors de la validation du panier',
                   freq: 'Moyenne',
                   category: 'BUG',
                   badgeColor: 'bg-red-500/10 text-red-400 border-red-500/20',
-                  matches: 'Ticket tech généré',
+                  matches: 'Diagnostic en cours',
                 },
                 {
-                  topic: 'Suivi de commande et numéro d’expédition transporteur',
+                  topic: 'Suivi de commande et lien d’expédition transporteur',
                   freq: 'Élevée',
                   category: 'QUESTION',
                   badgeColor: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
-                  matches: 'Résolu automatiquement par IA',
+                  matches: 'Résolu automatiquement',
                 },
               ].map((item, idx) => (
                 <div
@@ -346,7 +346,7 @@ export const DashboardView: React.FC = () => {
                     </p>
                     <div className="flex items-center gap-2">
                       <span
-                        className={`text-[10px] font-mono px-2 py-0.5 rounded border ${item.badgeColor}`}
+                        className={`text-[10px] px-2 py-0.5 rounded border ${item.badgeColor}`}
                       >
                         {item.category}
                       </span>
@@ -355,7 +355,7 @@ export const DashboardView: React.FC = () => {
                       </span>
                     </div>
                   </div>
-                  <span className="text-xs font-mono font-medium text-[var(--text-secondary)] bg-[var(--surface)] px-2 py-0.5 rounded border border-[var(--border-subtle)]">
+                  <span className="text-xs font-medium text-[var(--text-secondary)] bg-[var(--surface)] px-2 py-0.5 rounded border border-[var(--border-subtle)]">
                     {item.freq}
                   </span>
                 </div>
@@ -370,59 +370,59 @@ export const DashboardView: React.FC = () => {
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <Zap className="h-4 w-4 text-emerald-400" />
-            Cycle de Vie & Statuts des Conversations (State Machine)
+            État des Files de Prise en Charge
           </CardTitle>
           <CardDescription>
-            Contrôle en temps réel du passage de relais algorithme / humain
+            Répartition des tickets selon leur étape de traitement
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div className="p-4 rounded-xl border border-cyan-500/30 bg-cyan-500/10">
-              <span className="text-xs font-mono text-cyan-400 block mb-1">
-                STATUT : BOT
+            <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-hover)]">
+              <span className="text-xs text-[var(--text-secondary)] block mb-1">
+                Automatique
               </span>
-              <span className="text-2xl font-bold font-mono text-[var(--text-primary)]">
+              <span className="text-2xl font-semibold tracking-tight tabular-nums text-[var(--text-primary)]">
                 {data?.statuses.BOT || 0}
               </span>
-              <p className="text-[11px] text-[var(--text-secondary)] mt-1">
-                Géré à 100% par l'IA
+              <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                Réponses autonomes
               </p>
             </div>
 
-            <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/10">
-              <span className="text-xs font-mono text-amber-400 block mb-1">
-                PENDING_HUMAN
+            <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/5">
+              <span className="text-xs text-amber-500 block mb-1">
+                En attente
               </span>
-              <span className="text-2xl font-bold font-mono text-[var(--text-primary)]">
+              <span className="text-2xl font-semibold tracking-tight tabular-nums text-amber-500">
                 {data?.statuses.PENDING_HUMAN || 0}
               </span>
-              <p className="text-[11px] text-[var(--text-secondary)] mt-1">
-                Attente de prise en main
+              <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                Demandes d'escalade
               </p>
             </div>
 
-            <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10">
-              <span className="text-xs font-mono text-emerald-400 block mb-1">
-                HUMAN_ACTIVE
+            <div className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5">
+              <span className="text-xs text-emerald-500 block mb-1">
+                En cours
               </span>
-              <span className="text-2xl font-bold font-mono text-[var(--text-primary)]">
+              <span className="text-2xl font-semibold tracking-tight tabular-nums text-emerald-500">
                 {data?.statuses.HUMAN_ACTIVE || 0}
               </span>
-              <p className="text-[11px] text-[var(--text-secondary)] mt-1">
+              <p className="text-[11px] text-[var(--text-muted)] mt-1">
                 Conseiller en direct
               </p>
             </div>
 
-            <div className="p-4 rounded-xl border border-slate-500/30 bg-slate-500/10">
-              <span className="text-xs font-mono text-slate-400 block mb-1">
-                CLOSED / RESOLVED
+            <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-hover)]">
+              <span className="text-xs text-[var(--text-secondary)] block mb-1">
+                Résolus
               </span>
-              <span className="text-2xl font-bold font-mono text-[var(--text-primary)]">
+              <span className="text-2xl font-semibold tracking-tight tabular-nums text-[var(--text-primary)]">
                 {(data?.statuses.CLOSED || 0) + (data?.statuses.RESOLVED || 0)}
               </span>
-              <p className="text-[11px] text-[var(--text-secondary)] mt-1">
-                Tickets clôturés
+              <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                Dossiers clôturés
               </p>
             </div>
           </div>

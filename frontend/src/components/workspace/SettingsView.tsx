@@ -78,14 +78,14 @@ export const SettingsView: React.FC = () => {
       <div>
         <div className="flex items-center gap-2.5">
           <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)]">
-            Paramètres du Tenant
+            Paramètres du Service Support
           </h1>
           <Badge variant="secondary" className="text-xs">
-            Multi-Tenant Isolation
+            Espace Dédié
           </Badge>
         </div>
         <p className="text-sm text-[var(--text-secondary)] mt-1">
-          Configuration de l'entreprise, prompt système du bot IA et authentification API
+          Identité de l'entreprise, consignes de réponse et authentification API
         </p>
       </div>
 
@@ -94,17 +94,17 @@ export const SettingsView: React.FC = () => {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Bot className="h-5 w-5 text-indigo-400" />
-            <CardTitle className="text-base">Personnalisation du Bot IA</CardTitle>
+            <CardTitle className="text-base">Consignes de Réponse Automatisée</CardTitle>
           </div>
           <CardDescription>
-            Ajustez le comportement et le ton du bot pour les réponses autonomes RAG
+            Ajustez le ton, les règles de courtoisie et les consignes directrices pour les réponses automatiques
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSaveSettings} className="space-y-4">
             <div className="space-y-1">
               <label className="text-xs font-semibold text-[var(--text-secondary)]">
-                Nom de l'entreprise (Tenant)
+                Nom de l'entreprise
               </label>
               <Input
                 value={name}
@@ -116,7 +116,7 @@ export const SettingsView: React.FC = () => {
             <div className="space-y-1">
               <div className="flex justify-between items-center">
                 <label className="text-xs font-semibold text-[var(--text-secondary)]">
-                  Prompt Système du Bot (botSystemPrompt)
+                  Directives et règles éditoriales
                 </label>
                 <span className="text-[11px] font-mono text-[var(--text-muted)]">
                   ~{Math.round(botSystemPrompt.length / 4)} tokens
@@ -130,7 +130,7 @@ export const SettingsView: React.FC = () => {
                 className="w-full bg-[var(--surface-hover)] border border-[var(--border-strong)] rounded-xl p-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-xs leading-relaxed"
               />
               <p className="text-[11px] text-[var(--text-muted)]">
-                Ce prompt est injecté comme consigne racine avant chaque requête RAG transmise à Gemini.
+                Ces instructions cadrent la formulation des réponses automatiques générées à partir de votre documentation.
               </p>
             </div>
 

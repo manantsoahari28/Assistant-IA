@@ -95,6 +95,7 @@ model Conversation {
 
   @@index([tenantId, category])
   @@index([tenantId, status])
+  @@index([tenantId, updatedAt])
 }
 
 enum Category {

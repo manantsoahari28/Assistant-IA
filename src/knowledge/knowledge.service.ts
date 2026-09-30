@@ -1,8 +1,9 @@
 // src/knowledge/knowledge.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Tenant } from '@prisma/client';
 import OpenAI from 'openai';
+import { PDFParse } from 'pdf-parse';
 import { PrismaService } from '../prisma/prisma.service';
 import { AddDocumentDto } from './dto/add-document.dto';
 
@@ -216,6 +217,40 @@ export class KnowledgeService {
   async searchSimilarChunks(tenantId: string, query: string, limit = 3): Promise<string[]> {
     const scoredChunks = await this.searchSimilarChunksWithScores(tenantId, query, limit);
     return scoredChunks.map((c) => c.content);
+  }
+
+  async addPdfDocument(
+    tenant: Tenant,
+    buffer: Buffer,
+    filename: string,
+    customTitle?: string,
+  ) {
+    let extractedText = '';
+    const parser = new (PDFParse as any)({ data: buffer });
+    try {
+      const result = await parser.getText();
+      extractedText = (result.text || '').trim();
+    } catch (err) {
+      console.error('Erreur lors du parsing du PDF :', err);
+      throw new BadRequestException('Impossible d’extraire le texte du document PDF');
+    } finally {
+      await parser.destroy();
+    }
+
+    if (!extractedText) {
+      throw new BadRequestException(
+        'Le document PDF ne contient aucun texte extractible (il s’agit peut-être d’un PDF numérisé sans OCR)',
+      );
+    }
+
+    const documentTitle =
+      customTitle?.trim() || filename.replace(/\.pdf$/i, '').replace(/[-_]/g, ' ');
+
+    return this.addDocument(tenant, {
+      title: documentTitle,
+      content: extractedText,
+      sourceUrl: `document://${filename}`,
+    });
   }
 
   private splitTextIntoChunks(text: string, chunkSize: number): string[] {

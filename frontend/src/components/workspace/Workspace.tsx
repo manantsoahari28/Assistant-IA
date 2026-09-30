@@ -7,7 +7,7 @@ import {
   Settings,
   Moon,
   Sun,
-  Sparkles,
+  Headphones,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
@@ -34,15 +34,32 @@ export const Workspace: React.FC = () => {
     }
   }, [isDark]);
 
-  // Poll pending count and tenant info
+  // Fetch tenant settings once on mount
   useEffect(() => {
+    let isMounted = true;
+    api
+      .getTenantSettings()
+      .then((settings) => {
+        if (isMounted && settings?.name) {
+          setTenantName(settings.name);
+        }
+      })
+      .catch(() => {
+        // Silent error
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Poll pending count every 8 seconds (instead of 4s)
+  useEffect(() => {
+    let isMounted = true;
     const fetchPending = async () => {
       try {
         const pending = await api.getPendingConversations();
-        setPendingCount(pending.length);
-        const settings = await api.getTenantSettings();
-        if (settings?.name) {
-          setTenantName(settings.name);
+        if (isMounted) {
+          setPendingCount(pending.length);
         }
       } catch (e) {
         // Silent poll error
@@ -50,8 +67,11 @@ export const Workspace: React.FC = () => {
     };
 
     fetchPending();
-    const interval = setInterval(fetchPending, 4000);
-    return () => clearInterval(interval);
+    const interval = setInterval(fetchPending, 8000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   return (
@@ -62,13 +82,13 @@ export const Workspace: React.FC = () => {
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2.5">
             <div className="h-8 w-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white shadow-xs">
-              <Sparkles className="h-4 w-4" />
+              <Headphones className="h-4 w-4" />
             </div>
             <div>
               <span className="font-bold text-sm tracking-tight text-[var(--text-primary)]">
                 Assistant-IA
               </span>
-              <span className="text-[10px] text-indigo-400 font-mono block -mt-0.5">
+              <span className="text-[10px] text-[var(--text-secondary)] font-medium block -mt-0.5">
                 Espace Conseiller
               </span>
             </div>

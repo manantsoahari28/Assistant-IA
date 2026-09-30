@@ -5,12 +5,11 @@ import {
   X,
   Send,
   Bot,
-  ShieldCheck,
   Headphones,
   ChevronDown,
   ChevronUp,
   AlertCircle,
-  Sparkles,
+  BookOpen,
 } from 'lucide-react';
 import {
   api,
@@ -43,7 +42,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
       conversationId: '',
       role: 'ASSISTANT',
       content:
-        'Bonjour ! Je suis votre assistant virtuel propulsé par RAG. Comment puis-je vous aider aujourd’hui ?',
+        'Bonjour ! Comment pouvons-nous vous aider aujourd’hui ?',
       createdAt: new Date().toISOString(),
     },
   ]);
@@ -164,11 +163,10 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
           className="group relative flex h-14 w-14 items-center justify-center rounded-full bg-indigo-600 text-white shadow-xl hover:bg-indigo-500 transition-all duration-200 active:scale-[0.97] cursor-pointer"
           aria-label="Ouvrir le support"
         >
-          <span className="absolute -top-1 -right-1 flex h-4 w-4">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500 border-2 border-[var(--canvas)]"></span>
+          <span className="absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5">
+            <span className="inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 border-2 border-[var(--surface)] shadow-xs"></span>
           </span>
-          <MessageSquare className="h-6 w-6 transition-transform group-hover:scale-110" />
+          <MessageSquare className="h-6 w-6 transition-transform group-hover:scale-105" />
         </button>
       )}
 
@@ -178,11 +176,11 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
           {/* Header */}
           <div className="flex items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--surface-hover)] px-4 py-3">
             <div className="flex items-center gap-3">
-              <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30">
+              <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600/10 text-indigo-500 border border-indigo-500/20">
                 {status === 'HUMAN_ACTIVE' ? (
-                  <Headphones className="h-5 w-5 text-emerald-400" />
+                  <Headphones className="h-5 w-5 text-emerald-500" />
                 ) : (
-                  <Bot className="h-5 w-5 text-indigo-400" />
+                  <Bot className="h-5 w-5 text-indigo-500" />
                 )}
                 <span
                   className={cn(
@@ -190,15 +188,15 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
                     status === 'HUMAN_ACTIVE'
                       ? 'bg-emerald-500'
                       : status === 'PENDING_HUMAN'
-                      ? 'bg-amber-500 animate-pulse'
-                      : 'bg-cyan-500'
+                      ? 'bg-amber-500'
+                      : 'bg-emerald-500'
                   )}
                 />
               </div>
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold tracking-tight text-[var(--text-primary)]">
-                    Assistant-IA
+                    Support Client
                   </span>
                   {category && (
                     <Badge variant={category.toLowerCase() as any}>
@@ -208,10 +206,10 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
                 </div>
                 <span className="text-xs text-[var(--text-secondary)]">
                   {status === 'HUMAN_ACTIVE'
-                    ? 'Conseiller en direct'
+                    ? 'Conseiller en ligne'
                     : status === 'PENDING_HUMAN'
-                    ? 'En attente d’un conseiller'
-                    : 'RAG Vérifié (IA)'}
+                    ? 'Mise en relation...'
+                    : 'Support automatisé'}
                 </span>
               </div>
             </div>
@@ -284,16 +282,16 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
                   >
                     {msg.content}
 
-                    {/* RAG Citations & Sources */}
+                    {/* Documentation Sources */}
                     {msg.sources && msg.sources.length > 0 && (
                       <div className="mt-2.5 pt-2 border-t border-[var(--border-subtle)]">
                         <button
                           onClick={() => toggleSource(msg.id)}
-                          className="flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 transition-colors font-medium cursor-pointer"
+                          className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors font-medium cursor-pointer"
                         >
-                          <ShieldCheck className="h-3.5 w-3.5" />
+                          <BookOpen className="h-3.5 w-3.5 text-indigo-400" />
                           <span>
-                            {msg.sources.length} source(s) documentaire(s) vérifiée(s)
+                            {msg.sources.length} source{msg.sources.length > 1 ? 's' : ''} officielle{msg.sources.length > 1 ? 's' : ''}
                           </span>
                           {expandedSources[msg.id] ? (
                             <ChevronUp className="h-3 w-3" />
@@ -303,23 +301,20 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
                         </button>
 
                         {expandedSources[msg.id] && (
-                          <div className="mt-2 space-y-2 animate-in fade-in duration-150">
+                          <div className="mt-2 space-y-1.5 animate-in fade-in duration-150">
                             {msg.sources.map((src, idx) => (
                               <div
                                 key={idx}
-                                className="rounded-lg bg-[var(--surface)] p-2.5 text-xs border border-[var(--border-subtle)] space-y-1"
+                                className="rounded-lg bg-[var(--surface)] p-2.5 text-xs border border-[var(--border-subtle)]"
                               >
-                                <div className="flex items-center justify-between font-semibold text-[var(--text-primary)]">
-                                  <span>{src.documentTitle}</span>
-                                  {src.similarity && (
-                                    <span className="text-[10px] font-mono text-emerald-400">
-                                      {Math.round(src.similarity * 100)}% match
-                                    </span>
-                                  )}
+                                <div className="font-medium text-[var(--text-primary)]">
+                                  {src.documentTitle}
                                 </div>
-                                <p className="text-[11px] text-[var(--text-secondary)] italic">
-                                  "{src.chunkContent}"
-                                </p>
+                                {src.chunkContent && (
+                                  <p className="mt-1 text-[11px] text-[var(--text-secondary)] leading-relaxed">
+                                    {src.chunkContent}
+                                  </p>
+                                )}
                               </div>
                             ))}
                           </div>
@@ -339,9 +334,10 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
             })}
 
             {loading && (
-              <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)] bg-[var(--surface-hover)] p-3 rounded-xl w-fit border border-[var(--border-subtle)]">
-                <Sparkles className="h-4 w-4 animate-spin text-indigo-400" />
-                <span>Recherche documentaire et synthèse...</span>
+              <div className="flex items-center gap-1.5 px-4 py-3 rounded-2xl bg-[var(--surface-hover)] text-[var(--text-secondary)] w-fit border border-[var(--border-subtle)] rounded-bl-xs">
+                <span className="h-2 w-2 rounded-full bg-[var(--text-muted)] animate-bounce [animation-delay:-0.3s]" />
+                <span className="h-2 w-2 rounded-full bg-[var(--text-muted)] animate-bounce [animation-delay:-0.15s]" />
+                <span className="h-2 w-2 rounded-full bg-[var(--text-muted)] animate-bounce" />
               </div>
             )}
 

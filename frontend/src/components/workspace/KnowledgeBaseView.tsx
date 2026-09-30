@@ -33,6 +33,7 @@ export const KnowledgeBaseView: React.FC = () => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [sourceUrl, setSourceUrl] = useState('');
+  const [selectedPdf, setSelectedPdf] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [_error, setError] = useState<string | null>(null);
 
@@ -55,7 +56,27 @@ export const KnowledgeBaseView: React.FC = () => {
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !content.trim()) return;
+    if (!title.trim()) return;
+
+    if (selectedPdf) {
+      try {
+        setSubmitting(true);
+        await api.uploadPdfDocument(selectedPdf, title.trim());
+        setTitle('');
+        setContent('');
+        setSourceUrl('');
+        setSelectedPdf(null);
+        setIsAddOpen(false);
+        await fetchDocs();
+      } catch (err: any) {
+        alert(err.message || 'Erreur lors de l’ingestion du PDF');
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    if (!content.trim()) return;
 
     try {
       setSubmitting(true);
@@ -63,6 +84,7 @@ export const KnowledgeBaseView: React.FC = () => {
       setTitle('');
       setContent('');
       setSourceUrl('');
+      setSelectedPdf(null);
       setIsAddOpen(false);
       await fetchDocs();
     } catch (err: any) {
@@ -76,11 +98,20 @@ export const KnowledgeBaseView: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const isPdf = file.name.toLowerCase().endsWith('.pdf');
+
     if (!title) {
       const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
       setTitle(cleanName.charAt(0).toUpperCase() + cleanName.slice(1));
     }
 
+    if (isPdf) {
+      setSelectedPdf(file);
+      setContent('');
+      return;
+    }
+
+    setSelectedPdf(null);
     try {
       const text = await file.text();
       setContent(text);
@@ -90,7 +121,7 @@ export const KnowledgeBaseView: React.FC = () => {
   };
 
   const handleDelete = async (id: string, docTitle: string) => {
-    if (!confirm(`Supprimer définitivement le document "${docTitle}" et tous ses chunks vectoriels ?`)) {
+    if (!confirm(`Supprimer définitivement le document "${docTitle}" ?`)) {
       return;
     }
 
@@ -109,14 +140,14 @@ export const KnowledgeBaseView: React.FC = () => {
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)]">
-              Base de Connaissances Vectorielle
+              Base de Connaissances
             </h1>
-            <Badge variant="bot" className="text-xs">
-              RAG • pgvector
+            <Badge variant="default" className="text-xs">
+              Indexé
             </Badge>
           </div>
           <p className="text-sm text-[var(--text-secondary)] mt-1">
-            Documents ingérés, découpés en chunks (~500 car.) et vectorisés via Gemini Embeddings
+            Documentation officielle utilisée pour formuler des réponses fiables et vérifiées
           </p>
         </div>
 
@@ -131,14 +162,14 @@ export const KnowledgeBaseView: React.FC = () => {
             <DialogTrigger asChild>
               <Button size="sm" className="bg-indigo-600 hover:bg-indigo-500">
                 <Plus className="h-4 w-4 mr-1.5" />
-                Ajouter un Document (CRUD)
+                Ajouter un document
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-xl">
               <DialogHeader>
-                <DialogTitle>Ingérer un Document dans la Base RAG</DialogTitle>
+                <DialogTitle>Ajouter un document à la base</DialogTitle>
                 <DialogDescription>
-                  Le texte sera automatiquement segmenté en chunks et indexé dans pgvector.
+                  Le document sera automatiquement indexé pour enrichir les réponses du support.
                 </DialogDescription>
               </DialogHeader>
 
@@ -148,7 +179,7 @@ export const KnowledgeBaseView: React.FC = () => {
                   <input
                     type="file"
                     id="file-upload-input"
-                    accept=".txt,.md,.markdown,.json,.csv,.text"
+                    accept=".pdf,.txt,.md,.markdown,.json,.csv,.text"
                     onChange={handleFileUpload}
                     className="hidden"
                   />
@@ -158,10 +189,10 @@ export const KnowledgeBaseView: React.FC = () => {
                   >
                     <Upload className="h-5 w-5 text-indigo-400" />
                     <span className="text-xs font-medium text-[var(--text-primary)]">
-                      Importer un fichier texte (.txt, .md, .json)
+                      Importer un document (.pdf, .txt, .md, .json)
                     </span>
                     <span className="text-[10px] text-[var(--text-muted)]">
-                      Remplit automatiquement le titre et le contenu du document
+                      PDF extrait côté serveur ou préremplissage automatique du texte
                     </span>
                   </label>
                 </div>
@@ -189,36 +220,75 @@ export const KnowledgeBaseView: React.FC = () => {
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <div className="flex justify-between items-center">
-                    <label className="text-xs font-semibold text-[var(--text-secondary)]">
-                      Contenu textuel complet *
-                    </label>
-                    <span className="text-[11px] font-mono text-[var(--text-muted)]">
-                      ~{Math.ceil(content.length / 500)} chunk(s) prévus
-                    </span>
+                {selectedPdf ? (
+                  <div className="rounded-xl border border-indigo-500/40 bg-indigo-500/10 p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-xs">
+                          <FileText className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <div className="text-sm font-semibold text-[var(--text-primary)]">
+                            {selectedPdf.name}
+                          </div>
+                          <div className="text-xs text-[var(--text-secondary)]">
+                            {(selectedPdf.size / 1024).toFixed(1)} Ko • Fichier PDF
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedPdf(null)}
+                        className="text-xs text-red-400 hover:text-red-300 cursor-pointer"
+                      >
+                        Retirer
+                      </Button>
+                    </div>
+                    <p className="text-xs text-[var(--text-muted)] bg-[var(--surface)] p-2.5 rounded-lg border border-[var(--border-subtle)] leading-relaxed">
+                      Le serveur extraira automatiquement le texte du PDF, découpera le contenu en chunks de ~500 caractères et stockera les embeddings vectoriels dans <code>pgvector</code>.
+                    </p>
                   </div>
-                  <textarea
-                    required
-                    rows={8}
-                    placeholder="Collez ici le texte officiel de votre politique, FAQ ou documentation technique..."
-                    value={content}
-                    onChange={(e) => setContent(e.target.value)}
-                    className="w-full bg-[var(--surface-hover)] border border-[var(--border-strong)] rounded-xl p-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
+                ) : (
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-semibold text-[var(--text-secondary)]">
+                        Contenu textuel complet *
+                      </label>
+                      <span className="text-[11px] font-mono text-[var(--text-muted)]">
+                        ~{Math.ceil(content.length / 500)} chunk(s) prévus
+                      </span>
+                    </div>
+                    <textarea
+                      required={!selectedPdf}
+                      rows={8}
+                      placeholder="Collez ici le texte officiel de votre politique, FAQ ou documentation technique..."
+                      value={content}
+                      onChange={(e) => setContent(e.target.value)}
+                      className="w-full bg-[var(--surface-hover)] border border-[var(--border-strong)] rounded-xl p-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                )}
 
                 <div className="flex justify-end gap-2 pt-2">
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setIsAddOpen(false)}
+                    onClick={() => {
+                      setIsAddOpen(false);
+                      setSelectedPdf(null);
+                    }}
                     disabled={submitting}
                   >
                     Annuler
                   </Button>
-                  <Button type="submit" disabled={submitting || !title || !content}>
-                    {submitting ? 'Vectorisation en cours...' : 'Ingérer & Vectoriser'}
+                  <Button type="submit" disabled={submitting || !title || (!content && !selectedPdf)}>
+                    {submitting
+                      ? 'Vectorisation en cours...'
+                      : selectedPdf
+                        ? 'Extraire & Vectoriser le PDF'
+                        : 'Ingérer & Vectoriser'}
                   </Button>
                 </div>
               </form>

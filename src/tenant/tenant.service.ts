@@ -2,6 +2,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import * as crypto from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { TenantGuard } from '../auth/tenant.guard';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 
 @Injectable()
@@ -75,6 +76,9 @@ export class TenantService {
       },
     });
 
+    // Invalider le cache mémoire de ce tenant
+    TenantGuard.invalidateTenant(tenantId);
+
     return {
       message: 'Paramètres mis à jour avec succès',
       tenant: {
@@ -107,6 +111,9 @@ export class TenantService {
       where: { id: tenantId },
       data: { apiKeyHash: newHash },
     });
+
+    // Invalider le cache mémoire pour obliger à ré-authentifier avec la nouvelle clé
+    TenantGuard.invalidateTenant(tenantId);
 
     return {
       message: 'Clé API régénérée avec succès. Conservez-la en lieu sûr, elle ne sera plus jamais réaffichée.',

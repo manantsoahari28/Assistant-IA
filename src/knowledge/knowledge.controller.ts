@@ -1,4 +1,3 @@
-// src/knowledge/knowledge.controller.ts
 import {
   Body,
   Controller,
@@ -7,7 +6,11 @@ import {
   Param,
   Post,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBody,
   ApiOperation,
@@ -56,6 +59,28 @@ export class KnowledgeController {
     @Body() dto: AddDocumentDto,
   ) {
     return this.knowledgeService.addDocument(tenant, dto);
+  }
+
+  @Post('upload-pdf')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({
+    summary: 'Téléverser et vectoriser un document PDF',
+    description: 'Extrait le texte du PDF, le segmente en chunks et stocke les embeddings dans pgvector',
+  })
+  async uploadPdf(
+    @CurrentTenant() tenant: Tenant,
+    @UploadedFile()
+    file: {
+      buffer: Buffer;
+      originalname: string;
+      mimetype?: string;
+    },
+    @Body('title') title?: string,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Aucun fichier PDF fourni');
+    }
+    return this.knowledgeService.addPdfDocument(tenant, file.buffer, file.originalname, title);
   }
 
   @Get()

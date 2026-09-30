@@ -173,6 +173,27 @@ export const api = {
       body: JSON.stringify({ title, content, sourceUrl }),
     }),
 
+  uploadPdfDocument: async (file: File, title?: string): Promise<any> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (title) formData.append('title', title);
+
+    const apiKey = localStorage.getItem('assistant_ia_api_key') || 'cle-api-test-123';
+    const res = await fetch(`${API_BASE}/knowledge/upload-pdf`, {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+      },
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Échec de l’ingestion du document PDF');
+    }
+    return res.json();
+  },
+
   deleteDocument: (id: string): Promise<any> =>
     request(`/knowledge/${id}`, {
       method: 'DELETE',
